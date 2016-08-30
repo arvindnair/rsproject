@@ -1,0 +1,5 @@
+The recproject folder contains the folders preprocess, itemsimmethod and matrixfactmethod.
+They contain the following:
+1. preprocess folder: It contains the program for the pre-processing of Epinion Dataset(rpinput.java), ratings_data_.txt in which the missing items are removed and also README.txt containing instructions for the same.
+2. itemsimmethod folder: It contains the program for the Item-Item Similarity Method(recproject1.java), trainingdataepinion.txt, validationdataepinion.txt, testingdataepinion.txt, itemsimresults folder (which contains results of Item-Item Similarity Method) and also README.txt containing instructions for the same.
+3. matrixfactmethod folder: It contains the program for the Matrix Factorization Method(recproject2.jar), sourcecode.txt, jama.jar,  trainingdataepinion.txt, validationdataepinion.txt, testingdataepinion.txt, matrixfactresults folder (which contains results of Matrix Factorization  Method) and also README.txt containing instructions for the same. The sourcecode.txt and jama.jar is for reference only.

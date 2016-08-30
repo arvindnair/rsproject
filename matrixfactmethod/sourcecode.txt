@@ -1,0 +1,685 @@
+
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Arrays;
+import java.util.Scanner;
+
+import Jama.Matrix;
+
+
+/*Class for Candidate set generation*/
+class candidatep{
+	int item=0;
+	double pred=0.000;
+}
+
+public class recproject2 {
+
+	static int users=40163;
+	static int items=140000;
+	static int ratings=465377;
+	static int minR=1;
+	static int maxR=5;
+	static double HR=0;
+	static double ARHR=0;
+	static int k=0;
+	static int ratingst=99723;
+	static int userst=40163;
+	public static void main(String[] args) throws Exception {
+		
+		long startTimefull=System.currentTimeMillis();
+
+		/*CSR Input done by Hitendra Rathod*/
+		Scanner sc=new Scanner(new File("trainingdataepinion.txt"));
+		
+		int[] arr1=new int[3];
+		for(int i=0;i<arr1.length;i++){
+        	arr1[i]=0;
+        }
+		
+		int[] row_ptr=new int[users+1];
+		int[] col_ind=new int[ratings];
+		double[] val=new double[ratings];
+		
+		
+		int rc=0,cc=0,vc=0;
+		while(sc.hasNextLine()){
+			String countn=sc.nextLine();
+			String cntemp[]=countn.split(" ");
+		    int[] arr=new int[cntemp.length];
+	        
+			for(int i=0;i<cntemp.length;i++){
+	        	arr[i]=Integer.parseInt(cntemp[i]);
+	        }
+			
+			
+			if(arr[0]!=arr1[0]){
+				
+				
+				
+				if((arr[0]-arr1[0])>0){
+					int x=rc;
+				for(int i=x;i<arr[0];i++){
+					row_ptr[i]=vc;
+					rc++;
+				}
+				}
+				
+				else{
+				row_ptr[rc]=vc;
+                rc++;
+                
+				}
+			}
+			
+			val[vc]=arr[2];
+			col_ind[vc]=arr[1];
+			vc++;
+			
+			arr1=arr.clone();
+			
+			
+		}
+		row_ptr[rc]=vc;
+
+		/*Bias removal and mean calculation done by Arvind Nair*/
+		double sum=0,meanR=0;
+		for(int i=0;i<val.length;i++){
+			sum=sum+val[i];
+			}
+		meanR=sum/(val.length);
+		
+		double[] valb=new double[val.length];
+		for(int i=0;i<valb.length;i++){//removing the biases here
+			valb[i]=val[i];
+			valb[i]=valb[i]-meanR;
+			}
+		
+		
+		/*CSR Transpose done by Arvind Nair*/
+		double[] valT=new double[val.length];
+		int[] col_indT=new int[col_ind.length];
+		int[] row_ptrT=new int[items+1];//one extra than no. of items
+		
+		row_ptrT[0]=0;//starts from zero
+		int c2=0;
+		int c1=0;
+		for(int k=0;k<items;k++){//for each item
+			
+			if(k%500==0){
+				System.out.println("k: "+k);
+			}
+				
+			for(int j=0;j<col_ind.length;j++){
+				if((k+1)==col_ind[j]){
+					valT[c1]=valb[j];
+					boolean flag1=true;
+					int j1=0;
+					while(j1<row_ptr.length-1&&flag1==true){
+					     int r1=row_ptr[j1];
+					     int r2=row_ptr[j1+1];
+							
+					    	 if((j>=r1)&&(j<r2)){
+					    		 col_indT[c1]=j1+1;
+					    		 c1++;
+					    		 flag1=false;
+					    	  }
+							j1++;
+					    }
+					}
+			}
+			c2++;
+			row_ptrT[c2]=c1;
+		}
+		
+		
+		
+		
+		System.out.println();
+		
+		/*Input done by Arvind Nair*/
+		int maxlters;
+		double lambda,epsilon,kd;
+		BufferedReader br=new BufferedReader(new InputStreamReader(System.in));
+		System.out.println("Enter the latent dimension k: ");
+		k=Integer.parseInt(br.readLine());
+		kd=k;
+		
+		System.out.println("Enter the control parameter lambda: ");
+		lambda=Double.parseDouble(br.readLine());
+		
+		System.out.println("Enter the maximum number of iterations allowed maxlters: ");
+		maxlters=Integer.parseInt(br.readLine());
+		
+		System.out.println("Enter the ratio of value change epsilon: ");
+		epsilon=Double.parseDouble(br.readLine());
+		
+		
+		/*P and Q Matrices done by Arvind Nair*/
+		/*P the User Factor Matrix and Q the Item Factor Matrix generated*/
+		double[][] p=new double[users][k];
+		double[][] q=new double[items][k];
+		
+		for(int i=0;i<users;i++)
+		{
+			for(int j=0;j<k;j++){
+			p[i][j]=1/kd;	
+			}
+		}
+		
+		for(int i=0;i<items;i++)
+		{
+			for(int j=0;j<k;j++){
+			q[i][j]=1/kd;	
+			}
+		}
+		
+		Matrix P=new Matrix(p);
+		Matrix Q=new Matrix(q);
+		
+		int t=0;
+		double ft1=0;
+		
+		/*Timing done by Arvind Nair*/
+		long startTime1=System.currentTimeMillis();
+		
+		/*f(t) done by Arvind Nair*/
+		while(t<maxlters){
+			t++;
+			System.out.println("t: "+t);
+			
+			/*LS_Closed done by Arvind Nair*/
+			P=LS_closed(val,col_ind,row_ptr,row_ptrT,Q,k,lambda);//Fixing Q solving for P
+			
+			/*LS_Closed1 done by Arvind Nair*/
+			Q=LS_closed1(valT,col_indT,row_ptrT,P,k,lambda);//Fixing P solving for Q
+			
+			double rating1=0,rating1s=0,rating1sf=0,pqm=0;
+			double[][] putemp=new double[1][k];
+			double[][] qitemp=new double[1][k];
+		    
+			for(int i=0;i<row_ptr.length-1;i++){
+				int j=0;
+				for(j=row_ptr[i];j<row_ptr[i+1];j++){
+					rating1=val[j];
+					int a1=col_ind[j];
+					int a2=0;
+					for(int k1=0;k1<row_ptrT.length-1;k1++){
+						if(a1==row_ptrT[k1]){
+							a2=k1;
+							//break here
+						}
+					}
+					for(int k1=0;k1<k;k1++){
+						putemp[0][k1]=P.get(i,k1);
+					}
+					Matrix Putemp=new Matrix(putemp);
+					for(int k1=0;k1<k;k1++){
+						qitemp[0][k1]=Q.get(a2,k1);
+					}
+					Matrix Qitemp=new Matrix(qitemp);
+					Matrix Qitempt=Qitemp.transpose();
+					Matrix PQm=Putemp.times(Qitempt);
+					pqm=PQm.get(0,0);
+					rating1s=rating1-pqm;
+					rating1sf=rating1sf+(rating1s*rating1s);
+				}
+			}
+			double e3=0;
+			e3=P.normF();
+		
+			double f3=0;
+			f3=Q.normF();
+			
+			/*Checking if lesser than epsilon to break*/
+			double Y=lambda*(e3+f3);
+			double ft=rating1sf+Y;
+			
+			
+			System.out.println("ft: "+ft);
+			double rft=100;
+			double rft1=100;
+			double rft2=100;
+			if(t>1){
+				 rft1=ft-ft1;
+				 rft2=Math.abs(rft1);//taking absolute value to remove negative sign
+				 rft=rft2/ft1;
+			}
+			if(rft<epsilon){
+				break;
+			}
+			ft1=ft;
+			
+		}
+		
+		/*Timing done by Arvind Nair*/
+		long endTime1=System.currentTimeMillis();
+		float sec1=0;
+		sec1=(endTime1-startTime1)/1.0f;
+		System.out.print("The LS_Closed Function took: ");
+    	System.out.format("%.2f",sec1);
+    	System.out.println("ms");
+		
+	
+    	/*CSR Input done by Hitendra Rathod*/
+Scanner sct=new Scanner(new File("testingdataepinion.txt"));
+		
+		int[] arr1t=new int[3];
+		for(int i=0;i<arr1t.length;i++){
+        	arr1t[i]=0;
+        }
+		
+		int[] row_ptrt=new int[userst+1];
+		int[] col_indt=new int[ratingst];
+		int[] valt=new int[ratingst];
+		
+	
+		int rct=0,cct=0,vct=0;
+		while(sct.hasNextLine()){
+			String countnt=sct.nextLine();
+			String cntempt[]=countnt.split(" ");
+		    int[] arrt=new int[cntempt.length];
+	        
+			for(int i=0;i<cntempt.length;i++){
+	        	arrt[i]=Integer.parseInt(cntempt[i]);
+	        }
+			
+			
+			if(arrt[0]!=arr1t[0]){
+				
+				
+				
+				if((arrt[0]-arr1t[0])>0){
+					int x=rct;
+				for(int i=x;i<arrt[0];i++){
+					row_ptrt[i]=vct;
+					rct++;
+				}
+				}
+				
+				else{
+				row_ptrt[rct]=vct;
+                rct++;
+                
+				}
+			}
+			
+			valt[vct]=arrt[2];
+			col_indt[vct]=arrt[1];
+			vct++;
+			
+			arr1t=arrt.clone();
+			
+			
+		}
+		row_ptrt[rct]=vct;
+		
+		/*Timing done by Arvind Nair*/
+		long startTime2=System.currentTimeMillis();
+		
+		/*MSE RMSE Calculations Begin*/
+		/*MSE RMSE Calculations done by Arvind Nair*/
+		double MSE=0;
+		double RMSE=0;
+		double Pred=0;
+		for(int i=0;i<row_ptrt.length-1;i++){//users loop
+		double[] pdot=new double[k];
+		for(int k1=0;k1<k;k1++){
+			pdot[k1]=P.get(i,k1);
+		}
+		int j=0;
+		for(j=row_ptrt[i];j<row_ptrt[i+1];j++){//items loop
+			int a1=col_indt[j];
+			int a2=a1-1;
+			double a3=val[j];
+			double[] qdot=new double[k];
+			
+			for(int k1=0;k1<k;k1++){
+				qdot[k1]=Q.get(a2,k1);
+			}
+			double dotprod=0;
+			for(int k1=0;k1<k;k1++){
+				dotprod=dotprod+(pdot[k1]*qdot[k1]);
+			}
+				double Pred1=0;
+				Pred1=dotprod+meanR;
+				Pred=Pred+Pred1;
+				if(Pred<minR){/*Adjusting Prediction value into legal range*/
+					Pred=minR;
+				}
+				else if(Pred>maxR){
+					Pred=maxR;
+				}
+				
+			
+			double a4=a3-Pred;
+			MSE=MSE+(a4*a4);
+			Pred=0;
+		
+		}
+		}
+
+		MSE=MSE/ratingst;//MSE calculated
+		RMSE=Math.sqrt(MSE);//RMSE calculated
+
+		System.out.println("MSE: "+MSE);
+		System.out.println("RMSE: "+RMSE);
+		
+		/*Timing done by Arvind Nair*/
+		long endTime2=System.currentTimeMillis();
+		float sec2=0;
+		sec2=(endTime2-startTime2)/1.0f;
+		System.out.print("The MSE and RMSE took: ");
+    	System.out.format("%.2f",sec2);
+    	System.out.println("ms");
+
+    	/*Timing done by Arvind Nair*/
+		long startTime3=System.currentTimeMillis();
+		
+		
+		/*HR and ARHR done by Arvind Nair*/
+		hrarhr(P,Q,col_ind,row_ptr,col_indt,row_ptrt);
+		
+		
+		/*Timing done by Arvind Nair*/
+		long endTime3=System.currentTimeMillis();
+		float sec3=0;
+		sec3=(endTime3-startTime3)/1.0f;
+		System.out.print("The HR and ARHR took: ");
+    	System.out.format("%.2f",sec3);
+    	System.out.println("ms");
+		
+    	
+    	System.out.println("k="+k+" "+"lambda="+lambda+" "+"maxlters="+maxlters+" "+"epsilon="+epsilon);
+		
+    	/*Timing done by Arvind Nair*/
+		long endTimefull=System.currentTimeMillis();
+		float secfull=0;
+		secfull=(endTimefull-startTimefull)/1.0f;
+		System.out.print("The Total Program Execution took: ");
+    	System.out.format("%.2f",secfull);
+    	System.out.println("ms");
+		
+	}//main
+
+	
+	/*LS_Closed function done by Arvind Nair*/
+public static Matrix LS_closed(double[] valb,int[] col_ind,int[] row_ptr,int[] row_ptrT,Matrix Q,int k,double lambda){
+		
+		double[][] ptemp=new double[users][k];
+		for(int i=0;i<row_ptr.length-1;i++){
+			
+			int j=0;
+			double[][] br1=new double[1][k];
+			for(int k1=0;k1<k;k1++){
+				br1[0][k1]=0;
+			}
+			Matrix B1=Matrix.identity(k,k);
+			B1=B1.timesEquals(0);
+			for(j=row_ptr[i];j<row_ptr[i+1];j++){
+				int a1=col_ind[j]; 
+				int a2=0; 
+				double a3=valb[j];
+				for(int k1=0;k1<row_ptrT.length-1;k1++){
+					if(a1==row_ptrT[k1]){
+						a2=k1;
+						break;
+					}
+				}
+				double[] ar1=new double[k];
+				double[][] ar2=new double[1][k];
+			
+				for(int k1=0;k1<k;k1++){
+					ar1[k1]=a3*Q.get(a2,k1);
+					br1[0][k1]=br1[0][k1]+ar1[k1];
+				}
+			    for(int k1=0;k1<k;k1++){
+			    	ar2[0][k1]=Q.get(a2,k1);
+			    }
+			    Matrix AR2=new Matrix(ar2);
+			    Matrix AR2t=AR2.transpose();
+			    Matrix AR2m=AR2t.times(AR2);
+			    B1=B1.plusEquals(AR2m);
+			}
+			Matrix I1=Matrix.identity(k,k);
+			I1=I1.timesEquals(lambda);
+			B1=B1.plusEquals(I1);
+			B1=B1.inverse();
+			Matrix BR1=new Matrix(br1);
+			BR1=BR1.times(B1);
+			for(int k1=0;k1<k;k1++){
+				ptemp[i][k1]=BR1.get(0,k1);
+			}
+		}
+		Matrix Ptemp=new Matrix(ptemp);
+		return Ptemp;
+		
+	}
+
+
+/*LS_Closed1 function done by Arvind Nair*/
+public static Matrix LS_closed1(double[] valT,int[] col_indT,int[] row_ptrT,Matrix P,int k,double lambda){
+	double[][] qtemp=new double[items][k];
+	for(int i=0;i<row_ptrT.length-1;i++){//items loop
+		
+		
+		int j=0;
+		boolean flag=false;
+		if((row_ptrT[i+1]-row_ptrT[i])==0){
+			flag=true;
+		}
+		if(flag==false){
+		double[][] br1=new double[1][k];
+		for(int k1=0;k1<k;k1++){
+			br1[0][k1]=0;
+		}
+		Matrix B1=Matrix.identity(k,k);
+		B1=B1.timesEquals(0);
+		for(j=row_ptrT[i];j<row_ptrT[i+1]&&row_ptrT[i+1]!=0;j++){//users loop
+			int a1=col_indT[j]-1;
+			double a3=valT[j];
+			double[] ar1=new double[k];
+			double[][] ar2=new double[1][k];
+		
+			for(int k1=0;k1<k;k1++){
+				ar1[k1]=a3*P.get(a1,k1);
+				br1[0][k1]=br1[0][k1]+ar1[k1];
+			}
+		    for(int k1=0;k1<k;k1++){
+		    	ar2[0][k1]=P.get(a1,k1);
+		    }
+		    Matrix AR2=new Matrix(ar2);
+		    Matrix AR2t=AR2.transpose();
+		    Matrix AR2m=AR2t.times(AR2);
+		    B1=B1.plusEquals(AR2m);
+		}
+		Matrix I1=Matrix.identity(k,k);
+		I1=I1.timesEquals(lambda);
+		B1=B1.plusEquals(I1);
+		B1=B1.inverse();
+		Matrix BR1=new Matrix(br1);
+		BR1=BR1.times(B1);
+		for(int k1=0;k1<k;k1++){
+			qtemp[i][k1]=BR1.get(0,k1);
+		}
+	 }
+		else{
+			for(int k1=0;k1<k;k1++){
+				qtemp[i][k1]=0;
+			}
+		}
+	}
+	Matrix Qtemp=new Matrix(qtemp);
+	return Qtemp;
+	
+}
+
+/*HR and ARHR done by Arvind Nair*/
+/*HR and ARHR Calculation Function*/
+public static void hrarhr(Matrix Pt,Matrix Qt,int[] col_ind,int[] row_ptr, int[] col_indt,int[] row_ptrt) throws IOException{
+	int hits=0;
+    double rank=0;
+	Matrix Pt1=Pt;
+	Matrix Qt1=Qt;
+	
+	
+	int N;
+	BufferedReader br=new BufferedReader (new InputStreamReader(System.in));
+
+	
+	
+	System.out.println("Enter the value of N: ");
+	N=Integer.parseInt(br.readLine());
+	
+	double[] pt1=new double[k];
+	double[] qt1=new double[k];
+	double pqt1=0;
+	
+	for(int i=0;i<users;i++){//users loop
+		
+		
+		if((row_ptr[i+1]-row_ptr[i])!=0 && (row_ptrt[i+1]-row_ptrt[i])!=0){
+		int[] tempitems=new int[row_ptr[i+1]-row_ptr[i]];
+		int c1=0;
+		
+		for(int j=row_ptr[i];j<row_ptr[i+1];j++){
+		tempitems[c1]=col_ind[j];
+		c1++;
+		}
+		Arrays.sort(tempitems);
+		candidatep[] cand=new candidatep[items];
+		for(int c2=0;c2<cand.length;c2++){
+ 		   cand[c2]=new candidatep();
+ 	    }
+		int c3=0;
+		for(int j=0;j<items;j++){
+			boolean checkitem=false;
+			for(int ch=0;ch<tempitems.length&&(j+1)<=tempitems[ch];ch++){
+				if((j+1)==tempitems[ch]){
+					checkitem=true;
+					break;
+				}
+			}
+			
+			if(checkitem==false){
+			for(int c2=0;c2<k;c2++){
+				pt1[c2]=Pt1.get(i, c2);
+			}
+			
+			int titem=j;
+			for(int c2=0;c2<k;c2++){
+				qt1[c2]=Qt1.get(titem, c2);
+			}
+		
+			
+			for(int c2=0;c2<k;c2++){
+				pqt1=pqt1+(pt1[c2]*qt1[c2]);
+			}
+			cand[c3].item=j+1;
+			cand[c3].pred=pqt1;
+			c3++;
+			pqt1=0;
+			}//check if
+			
+			
+		}//j loop for items of a user
+		
+		    sort(cand);
+		    int[] itemtest=new int[row_ptrt[i+1]-row_ptrt[i]];
+		    int itemtestcount=0;
+		    
+		    for(int c2=row_ptrt[i];c2<row_ptrt[i+1];c2++){
+		     itemtest[itemtestcount]=col_indt[c2];
+		     itemtestcount++;
+		    }
+		    
+		    for(int c4=0;c4<itemtest.length;c4++){
+		    	
+		    
+		    for(int c2=0;c2<N;c2++){
+		    	if(itemtest[c4]==cand[c2].item){
+		    		hits++;
+		    		rank=rank+(1/(1+c2));
+		    	    break;
+		    	}
+		    	
+		    }
+		    }
+		}
+	}
+	HR=(double)hits/users;
+	ARHR=(double)rank/users;
+
+	System.out.println("HR is: "+HR);
+	System.out.println("ARHR is: "+ARHR);
+	
+
+	  
+	return;
+}
+
+/*Sort for Candidate Set done by Arvind Nair*/
+/*Candidate Set Sorting function*/
+public static void sort(candidatep[] cand1){
+    candidatep []tempArray = new candidatep[cand1.length];
+    for(int k=0;k<cand1.length;k++){
+		   tempArray[k]=new candidatep();
+	   }
+	  mergeSort(tempArray,0,cand1.length-1,cand1);
+   return;
+  }
+	      public static void mergeSort(candidatep[] tempArray,int lowerIndex,int upperIndex,candidatep[] cand1){
+	          if(lowerIndex == upperIndex){
+	              return;
+	          }
+	          else{
+	              int mid = (lowerIndex+upperIndex)/2;
+	              mergeSort(tempArray, lowerIndex, mid, cand1);
+	              mergeSort(tempArray, mid+1, upperIndex, cand1);
+	              merge(tempArray,lowerIndex,mid+1,upperIndex,cand1);
+	              }
+	          }
+	      public static void merge(candidatep[] tempArray,int lowerIndexCursor,int higherIndex,int upperIndex, candidatep[] cand1){
+	          int tempIndex=0;
+	          int lowerIndex = lowerIndexCursor;
+	          int midIndex = higherIndex-1;
+	          int totalItems = upperIndex-lowerIndex+1;
+	          while(lowerIndex <= midIndex && higherIndex <= upperIndex){
+	              if(cand1[lowerIndex].pred > cand1[higherIndex].pred){
+	                  tempArray[tempIndex].pred = cand1[lowerIndex].pred;
+	                  tempArray[tempIndex].item = cand1[lowerIndex].item;
+	                  lowerIndex++;
+	                  tempIndex++;
+                }
+	              else{
+	                  tempArray[tempIndex].pred = cand1[higherIndex].pred;
+	                  tempArray[tempIndex].item = cand1[higherIndex].item;
+	                  higherIndex++;
+	                  tempIndex++;
+	              }
+	          }
+	          while(lowerIndex <= midIndex){
+	              tempArray[tempIndex].pred = cand1[lowerIndex].pred;
+	              tempArray[tempIndex].item = cand1[lowerIndex].item;
+	              tempIndex++;
+	              lowerIndex++;
+	          }
+	          while(higherIndex <= upperIndex){
+	              tempArray[tempIndex].pred = cand1[higherIndex].pred;
+	              tempArray[tempIndex].item = cand1[higherIndex].item;
+	              tempIndex++;
+	              higherIndex++;
+	          }
+	          for(int i=0;i<totalItems;i++){
+	              cand1[lowerIndexCursor+i].pred = tempArray[i].pred;
+	              cand1[lowerIndexCursor+i].item= tempArray[i].item;
+	          }
+	      }
+
+}//class
+
+
